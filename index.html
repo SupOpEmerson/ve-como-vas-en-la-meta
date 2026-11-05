@@ -74,16 +74,7 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 .dt td{padding:7px 6px;border-bottom:1px solid var(--soft);text-align:right;vertical-align:top;white-space:nowrap}
 .dt td.p{text-align:left;white-space:normal;font-weight:700}.dt td.f{text-align:left;color:var(--mut)}.dt td.c{text-align:left;width:22px}
 .dt .m{display:block;font-weight:400;color:var(--mut);font-size:12.5px}
-.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
-/* login */
-#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
-.lg{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 22px;max-width:360px;width:100%;text-align:center}
-.lg h1{margin:0 0 6px;font-size:26px}.lg p{color:var(--mut);font-size:14px;margin:0 0 16px}
-.lg input[type=password]{width:100%;font-size:17px;padding:11px 12px;border:1px solid #c9cdd4;border-radius:8px}
-.lg button{margin-top:12px;width:100%;font-size:16px;font-weight:700;padding:11px;border:0;border-radius:8px;background:var(--link);color:#fff;cursor:pointer}
-.lg label{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px;color:var(--mut);margin-top:10px}
-.err{color:var(--r);font-size:13px;min-height:18px;margin-top:8px}
-.salir{float:right;border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--mut)}
+.dt .fi{font-weight:400;color:#6b7280;font-size:12px}.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
 @media (max-width:900px){
  .cols{grid-template-columns:1fr}.vd{grid-template-columns:repeat(2,1fr);gap:18px 10px}
  .pnw{flex-direction:column}.pnk{border-left:0;border-top:1px solid var(--line);min-width:0;grid-template-columns:1fr 1fr;padding:10px 0 0}
@@ -98,36 +89,11 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 </style>
 </head>
 <body>
-<div id="login"><form class="lg" id="lf" autocomplete="off">
- <h1>Tablero Unident</h1><p>Escribe la contraseña para ver el tablero.</p>
- <input type="password" id="pw" placeholder="Contraseña" autofocus>
- <label><input type="checkbox" id="rec"> Recordar en este equipo</label>
- <button type="submit" id="bt">Entrar</button><div class="err" id="er"></div>
-</form></div>
-<div class="page" id="app" hidden></div>
+
+<div class="page" id="app"><p style="color:#6b7280">Cargando tablero…</p></div>
 <script>
 const $=s=>document.querySelector(s);
-const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-let ENC=null;
-async function cargar(){ if(!ENC){const r=await fetch('datos.enc.json?v='+Date.now(),{cache:'no-store'});ENC=await r.json();} return ENC; }
-async function descifrar(pw){
-  const e=await cargar();
-  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
-  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(e.salt),iterations:e.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
-  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.ct));
-  return JSON.parse(new TextDecoder().decode(pt));
-}
-function guardar(pw){try{localStorage.setItem('tu_pw',pw)}catch(e){}}
-function olvidar(){try{localStorage.removeItem('tu_pw')}catch(e){}}
-async function entrar(pw,recordar){
-  $('#bt').disabled=true;$('#er').textContent='Abriendo…';
-  try{const D=await descifrar(pw); if(recordar)guardar(pw); $('#login').hidden=true;$('#login').style.display='none'; $('#app').hidden=false; pintar(D);}
-  catch(e){olvidar();$('#er').textContent=ENC?'Contraseña incorrecta.':'No se pudieron cargar los datos. Revisa tu conexión.';}
-  $('#bt').disabled=false;
-}
-$('#lf').addEventListener('submit',ev=>{ev.preventDefault();entrar($('#pw').value,$('#rec').checked);});
-(function(){let pw=null;try{pw=localStorage.getItem('tu_pw')}catch(e){} if(pw)entrar(pw,true);})();
-
+fetch('datos.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(pintar).catch(()=>{$('#app').innerHTML='<p style="color:#d93636">No se pudieron cargar los datos. Revisa tu conexión y recarga la página.</p>';});
 /* ---------- formato ---------- */
 const f2=v=>(v<0?'-':'')+Math.abs(v).toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,'X').replace(/\./g,',').replace(/X/g,'.');
 const q0=v=>(v===null||v===undefined||v==='')?'—':'Q'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
@@ -159,11 +125,10 @@ function pintar(D){
     return `<div class="vdc"><svg width="140" height="80" viewBox="0 0 120 70">${arcs}<line class="ndl" data-p="${pp.toFixed(2)}" x1="60" y1="62" x2="14" y2="62" style="transform-origin:60px 62px;transform:rotate(0deg)" stroke="#1d232b" stroke-width="3.5" stroke-linecap="round"/><circle cx="60" cy="62" r="5" fill="#1d232b"/></svg><div class="vdv" style="color:${ink}">${pp.toFixed(0)} %</div><div class="vdn">${esc(r.sede)}</div><div class="vds"><span>Vende por día</span><b>Q ${f2(ra)}</b></div><div class="vds"><span>Necesita por día</span><b>Q ${f2(r.diario)}</b></div></div>`;};
   const vdHtml=vd.length?`<div class="card"><h2>Velocidad de venta: ¿a qué ritmo va cada sede?</h2><p class="sub">La aguja marca qué % de la venta diaria necesaria logra hoy la sede. En verde va al ritmo; en rojo vende menos de la mitad de lo que necesita.</p><div class="vd">${vd.map(gauge).join('')}</div></div>`:'';
 
-  $('#app').innerHTML=`<button class="salir" id="salir">Salir</button><div class="ey">Datos al ${esc(D.fecha)} · actualizado ${esc(D.actualizado)}</div><h1>Avance de meta por clínica · Unident</h1>
+  $('#app').innerHTML=`<div class="ey">Datos al ${esc(D.fecha)} · actualizado ${esc(D.actualizado)}</div><h1>Avance de meta por clínica · Unident</h1>
   <div class="cols"><div class="card"><h2>Posiciones por avance de venta</h2><p class="sub">% de la meta mensual vendido. Azul marino: proyección al cierre.</p>${rank}</div>
   <div class="card"><h2>Monto atrasado</h2><p class="sub">Lo que cada sede debe vender para alcanzar lo esperado a hoy.</p><div class="semw">${sem}<div class="rules"><div><b style="background:#d93636"></b>Crítico: atraso de 12 % o más de su meta (${cnt.c})</div><div><b style="background:#f2c200"></b>En riesgo: de 6 % a 11,99 % (${cnt.m})</div><div><b style="background:#2fa65a"></b>Alcanzable: menos de 6 % (${cnt.e})</div></div></div>${mrows}</div></div>
   <div style="height:16px"></div>${vdHtml}<div class="card" id="pn"></div>`;
-  $('#salir').onclick=()=>{olvidar();location.reload();};
   requestAnimationFrame(()=>setTimeout(()=>{document.querySelectorAll('.fl[data-w]').forEach(e=>e.style.width=e.dataset.w+'%');document.querySelectorAll('.ndl').forEach(n=>n.style.transform=`rotate(${1.8*n.dataset.p}deg)`);},60));
   pacientes(D);
 }
@@ -196,11 +161,11 @@ function pacientes(D){
     if(!d)return;
     const fs=det.filter(x=>x.mes===mes&&x.sede===d.sede).sort((a,b)=>(a.fecha.split('/').reverse().join('')).localeCompare(b.fecha.split('/').reverse().join(''))||a.paciente.localeCompare(b.paciente));
     const at=fs.filter(x=>COL[x.color]), no=fs.filter(x=>!COL[x.color]);
-    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))}<span class="m">${esc(x.motivo)}</span></td><td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
-    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="4">${esc(titulo(x.paciente))}<span class="m">${esc(x.estado)}</span></td></tr>`;
+    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(x.paciente)} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span></td><td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
+    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="4">${esc(x.paciente)} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span></td></tr>`;
     $('#det').innerHTML=`<div class="dh"><h3>${esc(d.sede)} · ${esc(d.mes_label)}</h3><button id="cerrar">Cerrar ✕</button></div>
     <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)}</div>
-    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
+    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente (iniciales) · motivo</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
     ${no.length?`<tr><td colspan="6" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
