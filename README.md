@@ -1,5 +1,5 @@
 # Tablero Unident
 
 Página del tablero de Unident (avance de meta y pacientes nuevos).
-Los datos están en `datos.json`; los pacientes aparecen solo con iniciales y número de ficha.
+El tablero (`datos.json`) es abierto y solo tiene números. El detalle de pacientes (`detalle.enc.json`) está cifrado y se abre con contraseña.
 Se actualiza automáticamente desde las tareas diarias.

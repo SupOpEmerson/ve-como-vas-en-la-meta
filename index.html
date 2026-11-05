@@ -75,6 +75,14 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 .dt td.p{text-align:left;white-space:normal;font-weight:700}.dt td.f{text-align:left;color:var(--mut)}.dt td.c{text-align:left;width:22px}
 .dt .m{display:block;font-weight:400;color:var(--mut);font-size:12.5px}
 .dt .fi{font-weight:400;color:#6b7280;font-size:12px}.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
+#lk{position:fixed;inset:0;background:rgba(15,20,30,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+#lk.on{display:flex}.lg{background:#fff;border-radius:14px;padding:22px 20px;max-width:340px;width:100%;text-align:center}
+.lg h3{margin:0 0 6px;font-size:19px}.lg p{color:var(--mut);font-size:13.5px;margin:0 0 14px}
+.lg input[type=password]{width:100%;font-size:17px;padding:11px 12px;border:1px solid #c9cdd4;border-radius:8px}
+.lg .bts{display:flex;gap:8px;margin-top:12px}.lg button{flex:1;font-size:15px;font-weight:700;padding:10px;border-radius:8px;cursor:pointer}
+.lg .ok{border:0;background:var(--link);color:#fff}.lg .no{border:1px solid var(--line);background:#fff;color:var(--mut)}
+.lg label{display:flex;gap:8px;align-items:center;justify-content:center;font-size:13px;color:var(--mut);margin-top:10px}
+.err{color:var(--r);font-size:13px;min-height:18px;margin-top:8px}.lock{font-size:12px;color:var(--mut);margin-left:4px}
 @media (max-width:900px){
  .cols{grid-template-columns:1fr}.vd{grid-template-columns:repeat(2,1fr);gap:18px 10px}
  .pnw{flex-direction:column}.pnk{border-left:0;border-top:1px solid var(--line);min-width:0;grid-template-columns:1fr 1fr;padding:10px 0 0}
@@ -90,10 +98,34 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 </head>
 <body>
 
+<div id="lk"><form class="lg" id="lf" autocomplete="off"><h3>🔒 Detalle de pacientes</h3><p>El detalle con nombres de pacientes es solo para personal autorizado. Escribe la contraseña.</p>
+<input type="password" id="pw" placeholder="Contraseña"><label><input type="checkbox" id="rec"> Recordar en este equipo</label>
+<div class="bts"><button type="button" class="no" id="lkno">Cancelar</button><button type="submit" class="ok" id="bt">Ver detalle</button></div><div class="err" id="er"></div></form></div>
 <div class="page" id="app"><p style="color:#6b7280">Cargando tablero…</p></div>
 <script>
 const $=s=>document.querySelector(s);
 fetch('datos.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(pintar).catch(()=>{$('#app').innerHTML='<p style="color:#d93636">No se pudieron cargar los datos. Revisa tu conexión y recarga la página.</p>';});
+/* ---------- detalle cifrado ---------- */
+const b64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
+let DET=null, ENC=null;
+async function descifrar(pw){
+  if(!ENC){const r=await fetch('detalle.enc.json?v='+Date.now(),{cache:'no-store'});ENC=await r.json();}
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(ENC.salt),iterations:ENC.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(ENC.iv)},key,b64(ENC.ct))));
+}
+function pedirClave(){return new Promise(res=>{
+  let pw=null;try{pw=localStorage.getItem('tu_pw')}catch(e){}
+  if(pw){descifrar(pw).then(d=>{DET=d;res(true)}).catch(()=>{try{localStorage.removeItem('tu_pw')}catch(e){}abrir();});return;}
+  abrir();
+  function abrir(){$('#lk').classList.add('on');$('#er').textContent='';$('#pw').value='';setTimeout(()=>$('#pw').focus(),50);
+    $('#lkno').onclick=()=>{$('#lk').classList.remove('on');res(false);};
+    $('#lf').onsubmit=async ev=>{ev.preventDefault();$('#bt').disabled=true;$('#er').textContent='Abriendo…';
+      try{DET=await descifrar($('#pw').value);if($('#rec').checked){try{localStorage.setItem('tu_pw',$('#pw').value)}catch(e){}}$('#lk').classList.remove('on');res(true);}
+      catch(e){$('#er').textContent=ENC?'Contraseña incorrecta.':'No se pudo cargar el detalle. Revisa tu conexión.';}
+      $('#bt').disabled=false;};}
+});}
+
 /* ---------- formato ---------- */
 const f2=v=>(v<0?'-':'')+Math.abs(v).toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/,/g,'X').replace(/\./g,',').replace(/X/g,'.');
 const q0=v=>(v===null||v===undefined||v==='')?'—':'Q'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
@@ -138,7 +170,7 @@ const ORDEN=["Unicentro","Peri-Roosevelt","Pacific Center","Real del Parque","Po
 const HOJA={"Periroosevelt":"Peri-Roosevelt","Pacific":"Pacific Center","Americas":"Américas"};
 const COL={Rojo:'r',Amarillo:'y',Verde:'g',Azul:'b'};
 function pacientes(D){
-  const pn=D.pn||[], det=(D.det||[]).map(x=>Object.assign({},x,{sede:HOJA[x.sede]||x.sede}));
+  const pn=D.pn||[]; const det=()=>(DET||[]).map(x=>Object.assign({},x,{sede:HOJA[x.sede]||x.sede}));
   const meses=[...new Map(pn.map(d=>[d.mes,d])).values()].sort((a,b)=>b.mes.localeCompare(a.mes));
   if(!meses.length){$('#pn').remove();return;}
   let mes=meses[0].mes, sel=null;
@@ -152,20 +184,20 @@ function pacientes(D){
     ${g.map(d=>`<tr class="${d.sede===sel?'sel':''}"><td class="pl"><button data-s="${esc(d.sede)}">${esc(d.sede)}</button></td>${n(d.atendidos)}${n(d.rojo)}${n(d.amarillo)}${n(d.verde_total)}${n(d.azul)}</tr>`).join('')}
     <tr class="tot"><td class="pl">Total</td>${n(tot('atendidos'))}${n(tot('rojo'))}${n(tot('amarillo'))}${n(tot('verde_total'))}${n(tot('azul'))}</tr></tbody></table>
     <div class="pnk"><div><i class="sp g"></i>Pagó más de lo agendado</div><div><i class="sp y"></i>Pagó igual</div><div><i class="sp r"></i>Pagó menos</div><div><i class="sp b"></i>Mejoró por seguimiento</div></div></div>
-    <div class="hint">👆 Toca el nombre de una clínica para ver el detalle de sus pacientes.</div><div id="det"></div>`;
+    <div class="hint">👆 Toca el nombre de una clínica para ver el detalle de sus pacientes <span class=\"lock\">🔒 requiere contraseña</span></div><div id="det"></div>`;
     $('#pn').querySelectorAll('.mbt button').forEach(b=>b.onclick=()=>{mes=b.dataset.m;render();});
-    $('#pn').querySelectorAll('td.pl button').forEach(b=>b.onclick=()=>{sel=sel===b.dataset.s?null:b.dataset.s;render();if(sel)$('#det').scrollIntoView({behavior:'smooth',block:'start'});});
+    $('#pn').querySelectorAll('td.pl button').forEach(b=>b.onclick=async()=>{const s=b.dataset.s;if(sel===s){sel=null;render();return;}if(!DET&&!(await pedirClave()))return;sel=s;render();$('#det').scrollIntoView({behavior:'smooth',block:'start'});});
     if(sel) detalle(g.find(d=>d.sede===sel));
   }
   function detalle(d){
     if(!d)return;
-    const fs=det.filter(x=>x.mes===mes&&x.sede===d.sede).sort((a,b)=>(a.fecha.split('/').reverse().join('')).localeCompare(b.fecha.split('/').reverse().join(''))||a.paciente.localeCompare(b.paciente));
+    const fs=det().filter(x=>x.mes===mes&&x.sede===d.sede).sort((a,b)=>(a.fecha.split('/').reverse().join('')).localeCompare(b.fecha.split('/').reverse().join(''))||a.paciente.localeCompare(b.paciente));
     const at=fs.filter(x=>COL[x.color]), no=fs.filter(x=>!COL[x.color]);
-    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(x.paciente)} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span></td><td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
-    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="4">${esc(x.paciente)} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span></td></tr>`;
+    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span></td><td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
+    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="4">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span></td></tr>`;
     $('#det').innerHTML=`<div class="dh"><h3>${esc(d.sede)} · ${esc(d.mes_label)}</h3><button id="cerrar">Cerrar ✕</button></div>
     <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)}</div>
-    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente (iniciales) · motivo</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
+    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
     ${no.length?`<tr><td colspan="6" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
