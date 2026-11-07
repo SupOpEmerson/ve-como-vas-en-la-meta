@@ -108,7 +108,15 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 <div class="page" id="app"><p style="color:#6b7280">Cargando tablero…</p></div>
 <script>
 const $=s=>document.querySelector(s);
-fetch('datos.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(pintar).catch(()=>{$('#app').innerHTML='<p style="color:#d93636">No se pudieron cargar los datos. Revisa tu conexión y recarga la página.</p>';});
+let ULT='';
+function cargar2(primera){
+  fetch('datos.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{
+    if(t===ULT) return; // sin cambios: no se repinta
+    ULT=t; const y=window.scrollY; pintar(JSON.parse(t)); if(!primera) window.scrollTo(0,y);
+  }).catch(()=>{ if(primera) $('#app').innerHTML='<p style="color:#d93636">No se pudieron cargar los datos. Revisa tu conexión y recarga la página.</p>'; });
+}
+cargar2(true);
+setInterval(()=>cargar2(false), 120000); // revisa datos nuevos cada 2 minutos
 /* ---------- detalle cifrado ---------- */
 const b64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
 let DET=null, ENC=null;
@@ -161,7 +169,7 @@ function pintar(D){
     return `<div class="vdc"><svg width="140" height="80" viewBox="0 0 120 70">${arcs}<line class="ndl" data-p="${pp.toFixed(2)}" x1="60" y1="62" x2="14" y2="62" style="transform-origin:60px 62px;transform:rotate(0deg)" stroke="#1d232b" stroke-width="3.5" stroke-linecap="round"/><circle cx="60" cy="62" r="5" fill="#1d232b"/></svg><div class="vdv" style="color:${ink}">${pp.toFixed(0)} %</div><div class="vdn">${esc(r.sede)}</div><div class="vds"><span>Vende por día</span><b>Q ${f2(ra)}</b></div><div class="vds"><span>Necesita por día</span><b>Q ${f2(r.diario)}</b></div></div>`;};
   const vdHtml=vd.length?`<div class="card"><h2>Velocidad de venta: ¿a qué ritmo va cada sede?</h2><p class="sub">La aguja marca qué % de la venta diaria necesaria logra hoy la sede. En verde va al ritmo; en rojo vende menos de la mitad de lo que necesita.</p><div class="vd">${vd.map(gauge).join('')}</div></div>`:'';
 
-  $('#app').innerHTML=`<div class="ey">Datos al ${esc(D.fecha)} · actualizado ${esc(D.actualizado)}</div><h1>Avance de meta por clínica · Unident</h1>
+  $('#app').innerHTML=`<div class="ey">Datos al ${esc(D.fecha)} · actualizado ${esc(D.actualizado)} · se revisa solo cada 2 min</div><h1>Avance de meta por clínica · Unident</h1>
   <div class="cols"><div class="card"><h2>Posiciones por avance de venta</h2><p class="sub">% de la meta mensual vendido. Azul marino: proyección al cierre.</p>${rank}</div>
   <div class="card"><h2>Monto atrasado</h2><p class="sub">Lo que cada sede debe vender para alcanzar lo esperado a hoy.</p><div class="semw">${sem}<div class="rules"><div><b style="background:#d93636"></b>Crítico: atraso de 12 % o más de su meta (${cnt.c})</div><div><b style="background:#f2c200"></b>En riesgo: de 6 % a 11,99 % (${cnt.m})</div><div><b style="background:#2fa65a"></b>Alcanzable: menos de 6 % (${cnt.e})</div></div></div>${mrows}</div></div>
   <div style="height:16px"></div>${vdHtml}<div class="card" id="pn"></div>`;
