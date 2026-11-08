@@ -94,6 +94,10 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 #cmt,#cmq{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;margin-bottom:8px}
 .cft{display:flex;justify-content:space-between;align-items:center;gap:10px}#cme{font-size:12.5px;color:#374151}
 #cmg{background:#1d4ed8;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer}#cmg:disabled{opacity:.6}
+.clab{font-size:12.5px;color:#374151;font-weight:600;margin:4px 0 6px}#ctags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tchip{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:5px 11px;font:inherit;font-size:12.5px;cursor:pointer}.tchip.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.ctag{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 8px;margin:0 6px 3px 0}.ctag.ts{background:#fef3c7;color:#92400e}.ctag.tp{background:#fee2e2;color:#b91c1c}
+.cdel{border:0;background:none;color:#b91c1c;font:inherit;font-size:12px;cursor:pointer;padding:0}.cdel:hover{text-decoration:underline}
 .cnote{font-size:11.5px;color:#6b7280;margin-top:10px}.cmt{cursor:pointer}button.cmb{background:#fff;cursor:pointer;font:inherit;font-size:12px}
 #lk{position:fixed;inset:0;background:rgba(15,20,30,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
 #lk.on{display:flex}.lg{background:#fff;border-radius:14px;padding:22px 20px;max-width:340px;width:100%;text-align:center}
@@ -121,10 +125,11 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 
 <div id="cmx"><form class="cbx" id="cmf" autocomplete="off"><div class="chd"><div><b>💬 Comentarios</b><div id="cmh" class="cq"></div></div><button type="button" id="cmc" aria-label="Cerrar">✕</button></div>
 <div id="cml"></div>
-<textarea id="cmt" rows="3" maxlength="1500" placeholder="Escribe tu comentario…"></textarea>
+<div class="clab">Marcar paciente como:</div><div id="ctags"></div>
+<textarea id="cmt" rows="3" maxlength="1500" placeholder="Escribe tu comentario (opcional si marcaste una opción)…"></textarea>
 <input id="cmq" maxlength="80" placeholder="¿Quién comenta? (nombre y puesto)">
 <div class="cft"><span id="cme"></span><button id="cmg" type="submit">Guardar comentario</button></div>
-<div class="cnote">🔒 Se guarda cifrado con la contraseña del detalle. Los comentarios no se pueden borrar desde aquí.</div></form></div>
+<div class="cnote">🔒 Se guarda cifrado con la contraseña del detalle. Al eliminar, se registra quién lo eliminó.</div></form></div>
 <div id="lk"><form class="lg" id="lf" autocomplete="off"><h3>🔒 Detalle de pacientes</h3><p>El detalle con nombres de pacientes es solo para personal autorizado. Escribe la contraseña.</p>
 <input type="password" id="pw" placeholder="Contraseña"><label><input type="checkbox" id="rec"> Recordar en este equipo</label>
 <div class="bts"><button type="button" class="no" id="lkno">Cancelar</button><button type="submit" class="ok" id="bt">Ver detalle</button></div><div class="err" id="er"></div></form></div>
@@ -162,11 +167,13 @@ async function cargarComs(){
   try{
     const key=await ckey(), map={};
     for(const f of new Set(DET.map(x=>String(x.ficha||String(x.key||'').split('-')[0])))) map[await kOf(f)]=f;
-    const r=await fetch(SBU+'?select=k,iv,ct,creado&order=creado.desc&limit=5000',{headers:{apikey:SBK},cache:'no-store'});
+    const r=await fetch(SBU+'?select=id,k,iv,ct,creado&order=creado.desc&limit=5000',{headers:{apikey:SBK},cache:'no-store'});
     if(!r.ok)throw new Error(r.status);
-    const rows=await r.json(), nuevo={};
+    const rows=await r.json(), nuevo={}, borrados=new Set();
     for(const w of rows){const f=map[w.k];if(!f)continue;
-      try{const c=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(w.iv)},key,b64(w.ct))));c.f=w.creado;(nuevo[f]=nuevo[f]||[]).push(c);}catch(e){}}
+      try{const c=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(w.iv)},key,b64(w.ct))));
+        if(c.del){borrados.add(c.del);continue;}c.f=w.creado;c.id=w.id;(nuevo[f]=nuevo[f]||[]).push(c);}catch(e){}}
+    for(const f in nuevo){nuevo[f]=nuevo[f].filter(c=>!borrados.has(c.id));if(!nuevo[f].length)delete nuevo[f];}
     CM=nuevo;CMOK=true;CMERR=false;
   }catch(e){CMERR=true;}
   if(window.__rerender)window.__rerender(true);
@@ -174,23 +181,39 @@ async function cargarComs(){
 }
 setInterval(()=>cargarComs(),120000);
 const fh=iso=>{const d=new Date(iso);return d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});};
-let CMF=null, CMN='', CMS='';
-function abrirCm(f,n,sd){CMF=f;CMN=n;CMS=sd;$('#cmx').classList.add('on');try{$('#cmq').value=localStorage.getItem('tu_quien')||''}catch(e){}$('#cmt').value='';$('#cme').textContent='';pintarCm();setTimeout(()=>$('#cmt').focus(),50);}
+let CMF=null, CMN='', CMS='', CMTAG='';
+const TAGS=['PX sin tratamientos futuros','PX perdido'];
+const tagHtml=t=>t?`<span class="ctag ${t==='PX perdido'?'tp':'ts'}">${esc(t)}</span>`:'';
+function abrirCm(f,n,sd){CMF=f;CMN=n;CMS=sd;CMTAG='';pintarTags();$('#cmx').classList.add('on');try{$('#cmq').value=localStorage.getItem('tu_quien')||''}catch(e){}$('#cmt').value='';$('#cme').textContent='';pintarCm();setTimeout(()=>$('#cmt').focus(),50);}
 function pintarCm(){const l=CM[CMF]||[];$('#cmh').textContent=CMN+' · ficha '+CMF;
-  $('#cml').innerHTML=l.length?l.map(c=>`<div class="ci"><div class="ct">${esc(c.t)}</div><div class="cq">${esc(c.q||'')} · ${esc(fh(c.f))}</div></div>`).join(''):`<div class="cv">${CMOK?'Todavía no hay comentarios para este paciente.':(CMERR?'No se pudieron cargar los comentarios guardados (revisa tu conexión).':'Cargando comentarios…')}</div>`;}
-async function guardarCm(ev){ev.preventDefault();const t=$('#cmt').value.trim(),q=$('#cmq').value.trim();
-  if(!t||!q){$('#cme').textContent='Escribe el comentario y quién comenta.';return;}
+  $('#cml').innerHTML=l.length?l.map(c=>`<div class="ci">${tagHtml(c.tag)}${c.t?`<div class="ct">${esc(c.t)}</div>`:''}<div class="cq">${esc(c.q||'')} · ${esc(fh(c.f))}${c.id?` · <button type="button" class="cdel" data-del="${c.id}">🗑 Eliminar</button>`:''}</div></div>`).join(''):`<div class="cv">${CMOK?'Todavía no hay comentarios para este paciente.':(CMERR?'No se pudieron cargar los comentarios guardados (revisa tu conexión).':'Cargando comentarios…')}</div>`;}
+function pintarTags(){$('#ctags').innerHTML=TAGS.map(t=>`<button type="button" class="tchip ${CMTAG===t?'on':''}" data-tag="${esc(t)}">${CMTAG===t?'✔ ':''}${esc(t)}</button>`).join('');}
+async function borrarCm(id){const q=$('#cmq').value.trim();
+  if(!q){$('#cme').textContent='Escribe quién eres en "¿Quién comenta?" para poder eliminar.';$('#cmq').focus();return;}
+  if(!confirm('¿Eliminar este comentario? Ya no se verá en el link.'))return;
+  $('#cme').textContent='Eliminando…';
+  try{const key=await ckey(),iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc(JSON.stringify({del:Number(id),q:q.slice(0,80)}))));
+    const r=await fetch(SBU,{method:'POST',headers:{apikey:SBK,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({k:await kOf(CMF),iv:u8b64(iv),ct:u8b64(ct)})});
+    if(!r.ok)throw new Error(r.status);
+    CM[CMF]=(CM[CMF]||[]).filter(c=>c.id!=id);if(!CM[CMF].length)delete CM[CMF];
+    $('#cme').textContent='🗑 Comentario eliminado';pintarCm();if(window.__rerender)window.__rerender(true);
+  }catch(e){$('#cme').textContent='No se pudo eliminar. Revisa tu conexión e intenta de nuevo.';}}
+async function guardarCm(ev){ev.preventDefault();const t=$('#cmt').value.trim(),q=$('#cmq').value.trim(),tag=CMTAG;
+  if((!t&&!tag)||!q){$('#cme').textContent='Elige una opción o escribe el comentario, y pon quién comenta.';return;}
   $('#cmg').disabled=true;$('#cme').textContent='Guardando…';
   try{try{localStorage.setItem('tu_quien',q)}catch(e){}
     const key=await ckey(),iv=crypto.getRandomValues(new Uint8Array(12));
-    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc(JSON.stringify({t:t.slice(0,1500),q:q.slice(0,80),s:CMS}))));
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc(JSON.stringify({t:t.slice(0,1500),q:q.slice(0,80),s:CMS,tag}))));
     const r=await fetch(SBU,{method:'POST',headers:{apikey:SBK,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({k:await kOf(CMF),iv:u8b64(iv),ct:u8b64(ct)})});
     if(!r.ok)throw new Error(r.status);const w=(await r.json())[0]||{};
-    (CM[CMF]=CM[CMF]||[]).unshift({t,q,s:CMS,f:w.creado||new Date().toISOString()});
-    $('#cmt').value='';$('#cme').textContent='✅ Comentario guardado';pintarCm();if(window.__rerender)window.__rerender(true);
+    (CM[CMF]=CM[CMF]||[]).unshift({t,q,s:CMS,tag,id:w.id,f:w.creado||new Date().toISOString()});
+    $('#cmt').value='';CMTAG='';pintarTags();$('#cme').textContent='✅ Comentario guardado';pintarCm();if(window.__rerender)window.__rerender(true);
   }catch(e){$('#cme').textContent='No se pudo guardar. Revisa tu conexión e intenta de nuevo.';}
   $('#cmg').disabled=false;}
-document.addEventListener('click',e=>{const b=e.target.closest('[data-cmf]');if(b){e.preventDefault();abrirCm(b.dataset.cmf,b.dataset.cmn,b.dataset.cms);}});
+document.addEventListener('click',e=>{const tg=e.target.closest('[data-tag]');if(tg){CMTAG=CMTAG===tg.dataset.tag?'':tg.dataset.tag;pintarTags();return;}
+  const dl=e.target.closest('[data-del]');if(dl){borrarCm(dl.dataset.del);return;}
+  const b=e.target.closest('[data-cmf]');if(b){e.preventDefault();abrirCm(b.dataset.cmf,b.dataset.cmn,b.dataset.cms);}});
 $('#cmc').onclick=()=>$('#cmx').classList.remove('on');
 $('#cmx').addEventListener('click',e=>{if(e.target.id==='cmx')$('#cmx').classList.remove('on');});
 $('#cmf').onsubmit=guardarCm;
@@ -276,7 +299,7 @@ function pacientes(D){
     const pxt=x=>{const t=String(x.proxima||'');return t.replace(/(\d{2}\/\d{2})\/\d{4}/,'$1');};
     const pxc=x=>{const t=pxt(x);if(!t)return '<td class="px"></td>';return t.startsWith('Sin')?'<td class="px no">Sin próxima cita</td>':`<td class="px si">📅 ${esc(t)}</td>`;};
     const pxm=x=>{const t=pxt(x);if(!t)return '';return t.startsWith('Sin')?'<span class="pxm no">✕ Sin próxima cita</span>':`<span class="pxm si">📅 Próxima cita: ${esc(t)}</span>`;};
-    const cmList=x=>{const l=CM[x.ficha]||[];if(!l.length)return '';const c=l[0];const t=c.t.length>70?c.t.slice(0,70)+'…':c.t;return `<span class="cmt" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">“${esc(t)}”<em> — ${esc(c.q||'')}, ${esc(fh(c.f))}</em></span>`;};
+    const cmList=x=>{const l=CM[x.ficha]||[];if(!l.length)return '';const c=l[0];const t=(c.t||'').length>70?c.t.slice(0,70)+'…':(c.t||'');return `<span class="cmt" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">${tagHtml(c.tag)}${t?'“'+esc(t)+'”':''}<em> — ${esc(c.q||'')}, ${esc(fh(c.f))}</em></span>`;};
     const cmBtn=x=>{const n=(CM[x.ficha]||[]).length;return `<button class="cmb" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">💬 ${n?'Ver comentarios ('+n+')':'Comentar'}</button>`;};
     const cmc=x=>`<td class="cm">${cmList(x)}${cmBtn(x)}</td>`;
     const cmm=x=>`<span class="cmm">${cmList(x)}${cmBtn(x)}</span>`;
