@@ -79,6 +79,10 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 .dt td.p{text-align:left;white-space:normal;font-weight:700}.dt td.f{text-align:left;color:var(--mut)}.dt td.c{text-align:left;width:22px}
 .dt .m{display:block;font-weight:400;color:var(--mut);font-size:12.5px}
 .pnt td.scv{color:#d93636}.pnt th.scx{color:#d93636;font-size:10.5px;line-height:1.15}
+.dt td.cm{text-align:left;font-size:12.5px;min-width:170px;max-width:260px;white-space:normal}.dt th.cmh{text-align:left}
+.cmt{display:block;margin-bottom:4px;color:#374151;line-height:1.3}.cmt em{color:#6b7280;font-style:normal;font-size:11.5px}
+.cmb{display:inline-block;font-size:12px;font-weight:600;color:#1d4ed8;text-decoration:none;border:1px solid #c7d2fe;border-radius:999px;padding:2px 9px;white-space:nowrap}.cmb:hover{background:#eef2ff}
+.dt .cmm{display:none;margin-top:4px}
 .dt td.px{text-align:left;font-size:13px;font-weight:600;white-space:normal;min-width:110px}.dt th.pxh{text-align:left}
 .dt td.px.si,.dt .pxm.si{color:#1f7a44}.dt td.px.no,.dt .pxm.no{color:#d93636}.dt .pxm{display:none;font-size:12px;font-weight:600}
 .dt .fi{font-weight:400;color:#6b7280;font-size:12px}.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
@@ -99,7 +103,7 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
  .rrow{grid-template-columns:32px 1fr 92px;gap:8px}.rrow .trk{grid-column:2/4;grid-row:2}.pos{width:30px;height:30px;font-size:15px}.nm{font-size:16px}.val{font-size:18px}.val small,.st{font-size:11.5px}
  .mrow{grid-template-columns:1fr auto;gap:4px 8px}.mrow .trk{grid-column:1/3;grid-row:2}.mrow .nm{font-size:16px}.mrow .val{font-size:16px}.chip{grid-column:2;grid-row:3}
  .pnt th{padding:0 4px 8px;font-size:10px}.pnt td{padding:8px 4px;font-size:17px}.pnt td.pl button{font-size:15px}.sp{width:14px;height:14px}
- .dt td.px,.dt th.pxh{display:none}.dt .pxm{display:block}
+ .dt td.px,.dt th.pxh,.dt td.cm,.dt th.cmh,.dt td.nac{display:none}.dt .pxm,.dt .cmm{display:block}
  .dt{font-size:12.5px}.dt th:nth-child(2),.dt td.f{display:none}.dt td{padding:6px 3px}
 }
 </style>
@@ -213,12 +217,18 @@ function pacientes(D){
     const pxt=x=>{const t=String(x.proxima||'');return t.replace(/(\d{2}\/\d{2})\/\d{4}/,'$1');};
     const pxc=x=>{const t=pxt(x);if(!t)return '<td class="px"></td>';return t.startsWith('Sin')?'<td class="px no">Sin próxima cita</td>':`<td class="px si">📅 ${esc(t)}</td>`;};
     const pxm=x=>{const t=pxt(x);if(!t)return '';return t.startsWith('Sin')?'<span class="pxm no">✕ Sin próxima cita</span>':`<span class="pxm si">📅 Próxima cita: ${esc(t)}</span>`;};
-    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
-    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="3">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span>${pxm(x)}</td>${pxc(x)}</tr>`;
+    const FORMC='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAANAAq2dbe9UM1U0SVdXUTQ0MExYN1dKVkQ5T0lTVlFYUy4u&rd1a2cb0cba4240ac89762bb8fbacf191=';
+    const cmUrl=(x,sede)=>FORMC+encodeURIComponent(x.ficha)+'&rf331f134d2df4e0094168b4698d7949a='+encodeURIComponent(sede||x.sede||'');
+    const cmList=x=>(x.coments||[]).map(c=>`<span class="cmt">“${esc(c.t)}”<em> — ${esc(c.q||'')}${c.f?', '+esc(c.f.slice(8,10)+'/'+c.f.slice(5,7)):''}</em></span>`).join('');
+    const cmBtn=x=>`<a class="cmb" href="${cmUrl(x)}" target="_blank" rel="noopener">💬 Comentar</a>`;
+    const cmc=x=>`<td class="cm">${cmList(x)}${cmBtn(x)}</td>`;
+    const cmm=x=>`<span class="cmm">${cmList(x)}${cmBtn(x)}</span>`;
+    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}${cmm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}${cmc(x)}</tr>`;
+    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span>${pxm(x)}${cmm(x)}</td>${pxc(x)}<td class="nac" colspan="3"></td>${cmc(x)}</tr>`;
     $('#det').innerHTML=`<div class="dh"><h3>${esc(d.sede)} · ${esc(d.mes_label)}</h3><button id="cerrar">Cerrar ✕</button></div>
     <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)} · <b style="color:#d93636">${Math.round(d.sin_cita||0)} sin próxima cita</b></div>
-    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th class="pxh">Próxima cita</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
-    ${no.length?`<tr><td colspan="6" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
+    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th class="pxh">Próxima cita</th><th>Agend.</th><th>Pagó</th><th>Después</th><th class="cmh">Comentario</th></tr></thead><tbody>${at.map(fila).join('')}
+    ${no.length?`<tr><td colspan="8" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
   }
