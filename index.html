@@ -86,6 +86,15 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 .dt td.px{text-align:left;font-size:13px;font-weight:600;white-space:normal;min-width:110px}.dt th.pxh{text-align:left}
 .dt td.px.si,.dt .pxm.si{color:#1f7a44}.dt td.px.no,.dt .pxm.no{color:#d93636}.dt .pxm{display:none;font-size:12px;font-weight:600}
 .dt .fi{font-weight:400;color:#6b7280;font-size:12px}.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
+#cmx{position:fixed;inset:0;background:rgba(15,20,30,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#cmx.on{display:flex}.cbx{background:#fff;border-radius:14px;padding:18px;max-width:460px;width:100%;max-height:90vh;overflow:auto;text-align:left}
+.chd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}.chd button{border:0;background:#f3f4f6;border-radius:999px;width:30px;height:30px;cursor:pointer;font-size:14px}
+#cml{max-height:40vh;overflow:auto;margin-bottom:10px}.ci{border-left:3px solid #c7d2fe;padding:6px 10px;margin-bottom:8px;background:#f8fafc;border-radius:6px}
+.ct{white-space:pre-wrap;font-size:14px;color:#111827}.cq{font-size:12px;color:#6b7280;margin-top:2px}.cv{font-size:13px;color:#6b7280;padding:6px 0}
+#cmt,#cmq{width:100%;box-sizing:border-box;border:1px solid #d1d5db;border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;margin-bottom:8px}
+.cft{display:flex;justify-content:space-between;align-items:center;gap:10px}#cme{font-size:12.5px;color:#374151}
+#cmg{background:#1d4ed8;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer}#cmg:disabled{opacity:.6}
+.cnote{font-size:11.5px;color:#6b7280;margin-top:10px}.cmt{cursor:pointer}button.cmb{background:#fff;cursor:pointer;font:inherit;font-size:12px}
 #lk{position:fixed;inset:0;background:rgba(15,20,30,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
 #lk.on{display:flex}.lg{background:#fff;border-radius:14px;padding:22px 20px;max-width:340px;width:100%;text-align:center}
 .lg h3{margin:0 0 6px;font-size:19px}.lg p{color:var(--mut);font-size:13.5px;margin:0 0 14px}
@@ -110,6 +119,12 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 </head>
 <body>
 
+<div id="cmx"><form class="cbx" id="cmf" autocomplete="off"><div class="chd"><div><b>💬 Comentarios</b><div id="cmh" class="cq"></div></div><button type="button" id="cmc" aria-label="Cerrar">✕</button></div>
+<div id="cml"></div>
+<textarea id="cmt" rows="3" maxlength="1500" placeholder="Escribe tu comentario…"></textarea>
+<input id="cmq" maxlength="80" placeholder="¿Quién comenta? (nombre y puesto)">
+<div class="cft"><span id="cme"></span><button id="cmg" type="submit">Guardar comentario</button></div>
+<div class="cnote">🔒 Se guarda cifrado con la contraseña del detalle. Los comentarios no se pueden borrar desde aquí.</div></form></div>
 <div id="lk"><form class="lg" id="lf" autocomplete="off"><h3>🔒 Detalle de pacientes</h3><p>El detalle con nombres de pacientes es solo para personal autorizado. Escribe la contraseña.</p>
 <input type="password" id="pw" placeholder="Contraseña"><label><input type="checkbox" id="rec"> Recordar en este equipo</label>
 <div class="bts"><button type="button" class="no" id="lkno">Cancelar</button><button type="submit" class="ok" id="bt">Ver detalle</button></div><div class="err" id="er"></div></form></div>
@@ -133,8 +148,52 @@ async function descifrar(pw){
   if(!ENC){const r=await fetch('detalle.enc.json?v='+Date.now(),{cache:'no-store'});ENC=await r.json();}
   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
   const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(ENC.salt),iterations:ENC.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
-  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(ENC.iv)},key,b64(ENC.ct))));
+  const out=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(ENC.iv)},key,b64(ENC.ct))));
+  PW=pw; setTimeout(()=>cargarComs(),0); return out;
 }
+/* ---------- comentarios (Supabase, cifrados con la misma contraseña) ---------- */
+const SBU='https://undblfctjjzvltxzwlii.supabase.co/rest/v1/comentarios', SBK='sb_publishable_hVb--DGuCG3B-dvdncUd6w_x0AriAdd';
+let PW=null, CK=null, CM={}, CMOK=false, CMERR=false;
+const enc=t=>new TextEncoder().encode(t), u8b64=u=>btoa(String.fromCharCode(...u));
+async function ckey(){if(!CK){const base=await crypto.subtle.importKey('raw',enc(PW),'PBKDF2',false,['deriveKey']);CK=await crypto.subtle.deriveKey({name:'PBKDF2',salt:enc('unident-comentarios-v1'),iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}return CK;}
+async function kOf(f){const h=await crypto.subtle.digest('SHA-256',enc(PW+'|ficha|'+f));return [...new Uint8Array(h)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function cargarComs(){
+  if(!PW||!DET)return;
+  try{
+    const key=await ckey(), map={};
+    for(const f of new Set(DET.map(x=>String(x.ficha||String(x.key||'').split('-')[0])))) map[await kOf(f)]=f;
+    const r=await fetch(SBU+'?select=k,iv,ct,creado&order=creado.desc&limit=5000',{headers:{apikey:SBK},cache:'no-store'});
+    if(!r.ok)throw new Error(r.status);
+    const rows=await r.json(), nuevo={};
+    for(const w of rows){const f=map[w.k];if(!f)continue;
+      try{const c=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(w.iv)},key,b64(w.ct))));c.f=w.creado;(nuevo[f]=nuevo[f]||[]).push(c);}catch(e){}}
+    CM=nuevo;CMOK=true;CMERR=false;
+  }catch(e){CMERR=true;}
+  if(window.__rerender)window.__rerender(true);
+  if($('#cmx').classList.contains('on'))pintarCm();
+}
+setInterval(()=>cargarComs(),120000);
+const fh=iso=>{const d=new Date(iso);return d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});};
+let CMF=null, CMN='', CMS='';
+function abrirCm(f,n,sd){CMF=f;CMN=n;CMS=sd;$('#cmx').classList.add('on');try{$('#cmq').value=localStorage.getItem('tu_quien')||''}catch(e){}$('#cmt').value='';$('#cme').textContent='';pintarCm();setTimeout(()=>$('#cmt').focus(),50);}
+function pintarCm(){const l=CM[CMF]||[];$('#cmh').textContent=CMN+' · ficha '+CMF;
+  $('#cml').innerHTML=l.length?l.map(c=>`<div class="ci"><div class="ct">${esc(c.t)}</div><div class="cq">${esc(c.q||'')} · ${esc(fh(c.f))}</div></div>`).join(''):`<div class="cv">${CMOK?'Todavía no hay comentarios para este paciente.':(CMERR?'No se pudieron cargar los comentarios guardados (revisa tu conexión).':'Cargando comentarios…')}</div>`;}
+async function guardarCm(ev){ev.preventDefault();const t=$('#cmt').value.trim(),q=$('#cmq').value.trim();
+  if(!t||!q){$('#cme').textContent='Escribe el comentario y quién comenta.';return;}
+  $('#cmg').disabled=true;$('#cme').textContent='Guardando…';
+  try{try{localStorage.setItem('tu_quien',q)}catch(e){}
+    const key=await ckey(),iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},key,enc(JSON.stringify({t:t.slice(0,1500),q:q.slice(0,80),s:CMS}))));
+    const r=await fetch(SBU,{method:'POST',headers:{apikey:SBK,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify({k:await kOf(CMF),iv:u8b64(iv),ct:u8b64(ct)})});
+    if(!r.ok)throw new Error(r.status);const w=(await r.json())[0]||{};
+    (CM[CMF]=CM[CMF]||[]).unshift({t,q,s:CMS,f:w.creado||new Date().toISOString()});
+    $('#cmt').value='';$('#cme').textContent='✅ Comentario guardado';pintarCm();if(window.__rerender)window.__rerender(true);
+  }catch(e){$('#cme').textContent='No se pudo guardar. Revisa tu conexión e intenta de nuevo.';}
+  $('#cmg').disabled=false;}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-cmf]');if(b){e.preventDefault();abrirCm(b.dataset.cmf,b.dataset.cmn,b.dataset.cms);}});
+$('#cmc').onclick=()=>$('#cmx').classList.remove('on');
+$('#cmx').addEventListener('click',e=>{if(e.target.id==='cmx')$('#cmx').classList.remove('on');});
+$('#cmf').onsubmit=guardarCm;
 function pedirClave(){return new Promise(res=>{
   let pw=null;try{pw=localStorage.getItem('tu_pw')}catch(e){}
   if(pw){descifrar(pw).then(d=>{DET=d;res(true)}).catch(()=>{try{localStorage.removeItem('tu_pw')}catch(e){}abrir();});return;}
@@ -217,10 +276,8 @@ function pacientes(D){
     const pxt=x=>{const t=String(x.proxima||'');return t.replace(/(\d{2}\/\d{2})\/\d{4}/,'$1');};
     const pxc=x=>{const t=pxt(x);if(!t)return '<td class="px"></td>';return t.startsWith('Sin')?'<td class="px no">Sin próxima cita</td>':`<td class="px si">📅 ${esc(t)}</td>`;};
     const pxm=x=>{const t=pxt(x);if(!t)return '';return t.startsWith('Sin')?'<span class="pxm no">✕ Sin próxima cita</span>':`<span class="pxm si">📅 Próxima cita: ${esc(t)}</span>`;};
-    const FORMC='https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAANAAq2dbe9UM1U0SVdXUTQ0MExYN1dKVkQ5T0lTVlFYUy4u&rd1a2cb0cba4240ac89762bb8fbacf191=';
-    const cmUrl=(x,sede)=>FORMC+encodeURIComponent(x.ficha)+'&rf331f134d2df4e0094168b4698d7949a='+encodeURIComponent(sede||x.sede||'');
-    const cmList=x=>(x.coments||[]).map(c=>`<span class="cmt">“${esc(c.t)}”<em> — ${esc(c.q||'')}${c.f?', '+esc(c.f.slice(8,10)+'/'+c.f.slice(5,7)):''}</em></span>`).join('');
-    const cmBtn=x=>`<a class="cmb" href="${cmUrl(x)}" target="_blank" rel="noopener">💬 Comentar</a>`;
+    const cmList=x=>{const l=CM[x.ficha]||[];if(!l.length)return '';const c=l[0];const t=c.t.length>70?c.t.slice(0,70)+'…':c.t;return `<span class="cmt" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">“${esc(t)}”<em> — ${esc(c.q||'')}, ${esc(fh(c.f))}</em></span>`;};
+    const cmBtn=x=>{const n=(CM[x.ficha]||[]).length;return `<button class="cmb" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">💬 ${n?'Ver comentarios ('+n+')':'Comentar'}</button>`;};
     const cmc=x=>`<td class="cm">${cmList(x)}${cmBtn(x)}</td>`;
     const cmm=x=>`<span class="cmm">${cmList(x)}${cmBtn(x)}</span>`;
     const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}${cmm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}${cmc(x)}</tr>`;
@@ -232,6 +289,7 @@ function pacientes(D){
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
   }
+  window.__rerender=(keep)=>{if(!keep||sel)render();};
   render();
 }
 </script>
