@@ -78,6 +78,9 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 .dt td{padding:7px 6px;border-bottom:1px solid var(--soft);text-align:right;vertical-align:top;white-space:nowrap}
 .dt td.p{text-align:left;white-space:normal;font-weight:700}.dt td.f{text-align:left;color:var(--mut)}.dt td.c{text-align:left;width:22px}
 .dt .m{display:block;font-weight:400;color:var(--mut);font-size:12.5px}
+.pnt td.scv{color:#d93636}.pnt th.scx{color:#d93636;font-size:10.5px;line-height:1.15}
+.dt td.px{text-align:left;font-size:13px;font-weight:600;white-space:normal;min-width:110px}.dt th.pxh{text-align:left}
+.dt td.px.si,.dt .pxm.si{color:#1f7a44}.dt td.px.no,.dt .pxm.no{color:#d93636}.dt .pxm{display:none;font-size:12px;font-weight:600}
 .dt .fi{font-weight:400;color:#6b7280;font-size:12px}.dt td.pp{color:var(--b);font-weight:700}.dt td.z{color:#c3c7cf}.dt tr.na td{color:#8a909b}
 #lk{position:fixed;inset:0;background:rgba(15,20,30,.55);display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
 #lk.on{display:flex}.lg{background:#fff;border-radius:14px;padding:22px 20px;max-width:340px;width:100%;text-align:center}
@@ -96,6 +99,7 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
  .rrow{grid-template-columns:32px 1fr 92px;gap:8px}.rrow .trk{grid-column:2/4;grid-row:2}.pos{width:30px;height:30px;font-size:15px}.nm{font-size:16px}.val{font-size:18px}.val small,.st{font-size:11.5px}
  .mrow{grid-template-columns:1fr auto;gap:4px 8px}.mrow .trk{grid-column:1/3;grid-row:2}.mrow .nm{font-size:16px}.mrow .val{font-size:16px}.chip{grid-column:2;grid-row:3}
  .pnt th{padding:0 4px 8px;font-size:10px}.pnt td{padding:8px 4px;font-size:17px}.pnt td.pl button{font-size:15px}.sp{width:14px;height:14px}
+ .dt td.px,.dt th.pxh{display:none}.dt .pxm{display:block}
  .dt{font-size:12.5px}.dt th:nth-child(2),.dt td.f{display:none}.dt td{padding:6px 3px}
 }
 </style>
@@ -107,6 +111,7 @@ h2{font-size:18px;font-weight:600;margin:0 0 4px}.sub{font-size:12.5px;color:var
 <div class="bts"><button type="button" class="no" id="lkno">Cancelar</button><button type="submit" class="ok" id="bt">Ver detalle</button></div><div class="err" id="er"></div></form></div>
 <div class="page" id="app"><p style="color:#6b7280">Cargando tablero…</p></div>
 <script>
+const scn=v=>{v=Math.round(+v||0);return v?`<td class="scv">${v}</td>`:'<td class="pz">0</td>';};
 const $=s=>document.querySelector(s);
 let ULT='';
 function cargar2(primera){
@@ -192,9 +197,9 @@ function pacientes(D){
     const tot=k=>g.reduce((s,d)=>s+(+d[k]||0),0);
     $('#pn').innerHTML=`<div class="pnhead"><div><h2>Pacientes nuevos por clínica · ${esc(m.mes_label)}</h2></div><div class="mbt">${meses.map(x=>`<button data-m="${x.mes}" class="${x.mes===mes?'on':''}">${esc(x.mes_label.split(' ')[0])}</button>`).join('')}</div></div>
     <div class="per">${m.tipo==='actual'?'Mes actual':'Mes cerrado'} · pacientes nuevos atendidos del ${esc(m.periodo)}, según lo que pagaron frente a lo agendado. Sin ASYS.</div>
-    <div class="pnw"><table class="pnt"><thead><tr><th class="pl">Clínica</th><th>PX nuevos</th><th><i class="sp r"></i></th><th><i class="sp y"></i></th><th><i class="sp g"></i></th><th><i class="sp b"></i></th></tr></thead><tbody>
-    ${g.map(d=>`<tr class="${d.sede===sel?'sel':''}"><td class="pl"><button data-s="${esc(d.sede)}">${esc(d.sede)}</button></td>${n(d.atendidos)}${n(d.rojo)}${n(d.amarillo)}${n(d.verde_total)}${n(d.azul)}</tr>`).join('')}
-    <tr class="tot"><td class="pl">Total</td>${n(tot('atendidos'))}${n(tot('rojo'))}${n(tot('amarillo'))}${n(tot('verde_total'))}${n(tot('azul'))}</tr></tbody></table>
+    <div class="pnw"><table class="pnt"><thead><tr><th class="pl">Clínica</th><th>PX nuevos</th><th class="scx">Sin próxima<br>cita</th><th><i class="sp r"></i></th><th><i class="sp y"></i></th><th><i class="sp g"></i></th><th><i class="sp b"></i></th></tr></thead><tbody>
+    ${g.map(d=>`<tr class="${d.sede===sel?'sel':''}"><td class="pl"><button data-s="${esc(d.sede)}">${esc(d.sede)}</button></td>${n(d.atendidos)}${scn(d.sin_cita)}${n(d.rojo)}${n(d.amarillo)}${n(d.verde_total)}${n(d.azul)}</tr>`).join('')}
+    <tr class="tot"><td class="pl">Total</td>${n(tot('atendidos'))}${scn(tot('sin_cita'))}${n(tot('rojo'))}${n(tot('amarillo'))}${n(tot('verde_total'))}${n(tot('azul'))}</tr></tbody></table>
     <div class="pnk"><div><i class="sp g"></i>Pagó más de lo agendado</div><div><i class="sp y"></i>Pagó igual</div><div><i class="sp r"></i>Pagó menos</div><div><i class="sp b"></i>Mejoró por seguimiento</div></div></div>
     <div class="hint">👆 Toca el nombre de una clínica para ver el detalle de sus pacientes <span class=\"lock\">🔒 requiere contraseña</span></div><div id="det"></div>`;
     $('#pn').querySelectorAll('.mbt button').forEach(b=>b.onclick=()=>{mes=b.dataset.m;render();});
@@ -205,11 +210,14 @@ function pacientes(D){
     if(!d)return;
     const fs=det().filter(x=>x.mes===mes&&x.sede===d.sede).sort((a,b)=>(a.fecha.split('/').reverse().join('')).localeCompare(b.fecha.split('/').reverse().join(''))||a.paciente.localeCompare(b.paciente));
     const at=fs.filter(x=>COL[x.color]), no=fs.filter(x=>!COL[x.color]);
-    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span></td><td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
-    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="4">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span></td></tr>`;
+    const pxt=x=>{const t=String(x.proxima||'');return t.replace(/(\d{2}\/\d{2})\/\d{4}/,'$1');};
+    const pxc=x=>{const t=pxt(x);if(!t)return '<td class="px"></td>';return t.startsWith('Sin')?'<td class="px no">Sin próxima cita</td>':`<td class="px si">📅 ${esc(t)}</td>`;};
+    const pxm=x=>{const t=pxt(x);if(!t)return '';return t.startsWith('Sin')?'<span class="pxm no">✕ Sin próxima cita</span>':`<span class="pxm si">📅 Próxima cita: ${esc(t)}</span>`;};
+    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
+    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p" colspan="3">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span>${pxm(x)}</td>${pxc(x)}</tr>`;
     $('#det').innerHTML=`<div class="dh"><h3>${esc(d.sede)} · ${esc(d.mes_label)}</h3><button id="cerrar">Cerrar ✕</button></div>
-    <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)}</div>
-    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
+    <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)} · <b style="color:#d93636">${Math.round(d.sin_cita||0)} sin próxima cita</b></div>
+    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th class="pxh">Próxima cita</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
     ${no.length?`<tr><td colspan="6" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
