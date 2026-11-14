@@ -272,19 +272,51 @@ function pintar(D){
 const ORDEN=["Unicentro","Peri-Roosevelt","Pacific Center","Real del Parque","Portales","Américas","Eskala","Santa Clara"];
 const HOJA={"Periroosevelt":"Peri-Roosevelt","Pacific":"Pacific Center","Americas":"Américas"};
 // Excel (.xlsx) sin librerías: arma el libro y lo empaqueta en ZIP (sin compresión).
-function xlsxBlob(head,rows,widths,sheet){
+function xlsxBlob(rows,widths,sheet,opts){
+  // rows: [{h:altura, c:[celda,...]}]; celda: {v:valor, s:estilo} o {r:[[texto,{b,i,sz,c}],...], s:estilo}
+  opts=opts||{};
   const X=v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,'');
   const col=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=(i-m-1)/26;}return s;};
-  const cell=(v,r,c,st)=>{const ref=col(c)+r;if(v===''||v===null||v===undefined)return '';if(typeof v==='number'&&isFinite(v))return `<c r="${ref}"${st?` s="${st}"`:' s="2"'}><v>${v}</v></c>`;return `<c r="${ref}" t="inlineStr"${st?` s="${st}"`:''}><is><t xml:space="preserve">${X(v)}</t></is></c>`;};
-  const all=[head,...rows];const last=col(head.length-1)+all.length;
-  const sd=all.map((r,i)=>`<row r="${i+1}">${r.map((v,c)=>cell(v,i+1,c,i===0?1:0)).join('')}</row>`).join('');
+  const rpr=f=>`<rPr>${f.b?'<b/>':''}${f.i?'<i/>':''}<sz val="${f.sz||11}"/><color rgb="FF${f.c||'111827'}"/><rFont val="Calibri"/></rPr>`;
+  const cell=(x,r,c)=>{if(x==null)return '';const ref=col(c)+r,st=x.s?` s="${x.s}"`:'';
+    if(x.r)return `<c r="${ref}" t="inlineStr"${st}><is>${x.r.filter(a=>a[0]!=='').map(([t,f])=>`<r>${rpr(f||{})}<t xml:space="preserve">${X(t)}</t></r>`).join('')}</is></c>`;
+    const v=x.v;if(v===''||v==null)return `<c r="${ref}"${st}/>`;
+    if(typeof v==='number'&&isFinite(v))return `<c r="${ref}"${st}><v>${v}</v></c>`;
+    return `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${X(v)}</t></is></c>`;};
+  const sd=rows.map((r,i)=>`<row r="${i+1}"${r.h?` ht="${r.h}" customHeight="1"`:''}>${r.c.map((x,c)=>cell(x,i+1,c)).join('')}</row>`).join('');
+  const merges=(opts.merges||[]);
+  const B='<border><left/><right/><top/><bottom style="thin"><color rgb="FFE5E7EB"/></bottom><diagonal/></border>';
+  const B2='<border><left/><right/><top/><bottom style="medium"><color rgb="FFD1D5DB"/></bottom><diagonal/></border>';
+  const F=(o)=>`<font>${o.b?'<b/>':''}${o.i?'<i/>':''}<sz val="${o.sz||11}"/><color rgb="FF${o.c||'111827'}"/><name val="Calibri"/></font>`;
+  const fonts=[F({}),F({b:1,sz:16}),F({sz:10,c:'374151'}),F({b:1,sz:9,c:'6B7280'}),F({b:1,sz:11,c:'111827'}),F({b:1,sz:11,c:'D93636'}),F({b:1,sz:11,c:'15803D'}),F({b:1,sz:11,c:'2563EB'}),
+    F({sz:16,c:'D93636'}),F({sz:16,c:'F5B700'}),F({sz:16,c:'22A559'}),F({sz:16,c:'2F6FD6'}),F({sz:16,c:'9CA3AF'}),F({sz:11,c:'4B5563'}),F({b:1,sz:11,c:'6B7280'}),F({sz:11,c:'9CA3AF'}),F({b:1,sz:10,c:'D93636'})];
+  const A=(h,v,w,ind)=>`<alignment${h?` horizontal="${h}"`:''} vertical="${v||'top'}"${w?' wrapText="1"':''}${ind?` indent="${ind}"`:''}/>`;
+  const xf=(f,b,al,n)=>`<xf numFmtId="${n||0}" fontId="${f}" fillId="0" borderId="${b}" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"${n?' applyNumberFormat="1"':''}>${al}</xf>`;
+  const xfs=[ '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>',
+    xf(1,0,A(null,'center')),            //1 título
+    xf(2,0,A(null,'center')),            //2 resumen
+    xf(3,2,A(null,'bottom')),            //3 encabezado
+    xf(8,1,A('center')),xf(9,1,A('center')),xf(10,1,A('center')),xf(11,1,A('center')),xf(12,1,A('center')), //4-8 punto
+    xf(13,1,A()),                        //9 fecha
+    xf(0,1,A(null,'top',1)),             //10 paciente (texto enriquecido)
+    xf(6,1,A(null,'top',1)),             //11 próxima cita verde
+    xf(5,1,A(null,'top',1)),             //12 sin próxima cita rojo
+    xf(0,1,A('right'),164),              //13 monto
+    xf(7,1,A('right'),164),              //14 monto azul
+    xf(15,1,A('center')),                //15 guion
+    xf(0,1,A('left','top',1,2)),          //16 comentario
+    xf(14,0,A(null,'bottom')),           //17 sección
+    xf(3,2,A('right','bottom')),         //18 encabezado derecha
+    xf(0,1,A()),                         //19 vacío con borde
+    xf(3,2,A('left','bottom',0,2))       //20 encabezado comentario
+  ];
   const files={
     '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
     '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
-    'xl/workbook.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${X(sheet||'Pacientes')}" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${X(sheet||'Pacientes').replace(/'/g,"''")}'!$A$1:$${col(head.length-1)}$${all.length}</definedName></definedNames></workbook>`,
+    'xl/workbook.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${X(sheet||'Pacientes')}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
     'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
-    'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;Q&quot;#,##0.00"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF16A34A"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
-    'xl/worksheets/sheet1.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData><autoFilter ref="A1:${last}"/></worksheet>`
+    'xl/styles.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;Q&quot;#,##0"/></numFmts><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="3"><border/>${B}${B2}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`,
+    'xl/worksheets/sheet1.xml':`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0" showGridLines="0"><pane ySplit="${opts.freeze||0}" topLeftCell="A${(opts.freeze||0)+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData>${merges.length?`<mergeCells count="${merges.length}">${merges.map(m=>`<mergeCell ref="${m}"/>`).join('')}</mergeCells>`:''}<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`
   };
   const enc=new TextEncoder(),T=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[n]=c>>>0;}
   const crc=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=T[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;};
@@ -341,12 +373,23 @@ function pacientes(D){
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
     $('#descargar').onclick=async()=>{const bt=$('#descargar');bt.disabled=true;bt.textContent='Preparando…';
       try{
-        const CL={Rojo:'Rojo (pagó menos de lo agendado)',Amarillo:'Amarillo (pagó lo agendado)',Verde:'Verde (pagó más de lo agendado)',Azul:'Azul (pagó después)'};
-        const num=v=>(v===null||v===undefined||v==='')?'':Number(v);
-        const cms=x=>(CM[x.ficha]||[]).map(c=>[c.tag,c.t].filter(Boolean).join(': ')+(c.q?' ('+c.q+', '+fh(c.f)+')':'')).join(' | ');
-        const H=['Fecha','Paciente','Ficha','Motivo de la cita','Estado de la cita','Asistió','Resultado','Próxima cita','Agendado (Q)','Pagó 1ª cita (Q)','Pagos después (Q)','Comentarios'];
-        const fil=(x,a)=>[x.fecha,titulo(x.paciente),Number(x.ficha)||x.ficha,x.motivo,x.estado,a?'Sí':'No',a?(CL[x.color]||x.color||''):'No asistió / canceló',String(x.proxima||''),a?num(x.agendado):'',a?num(x.pagado):'',a?num(x.posterior):'',cms(x)];
-        const blob=xlsxBlob(H,[...at.map(x=>fil(x,true)),...no.map(x=>fil(x,false))],[11,34,8,55,18,8,30,24,13,15,16,50],(d.sede+' '+d.mes_label).replace(/[\\/?*\[\]:]/g,'').slice(0,31));
+        const DOT={Rojo:4,Amarillo:5,Verde:6,Azul:7};
+        const lines=t=>Math.max(1,Math.ceil(String(t||'').length/62));
+        const pacR=(x,sub)=>({s:10,r:[[titulo(x.paciente),{b:1,sz:11}],[' · ficha '+x.ficha,{sz:9,c:'9CA3AF'}],['\n'+(sub||''),{sz:9,c:'6B7280'}]]});
+        const prox=x=>{const t=pxt(x);if(!t)return {v:'',s:19};return t.startsWith('Sin')?{v:'Sin próxima cita',s:12}:{v:'📅 '+t,s:11};};
+        const mon=v=>(v===null||v===undefined||v==='')?{v:'—',s:15}:{v:Number(v),s:13};
+        const com=x=>{const l=CM[x.ficha]||[];if(!l.length)return {v:'',s:19};const r=[];l.forEach((c,k)=>{if(k)r.push(['\n',{}]);if(c.tag)r.push([c.tag+'  ',{b:1,sz:10,c:c.tag==='PX perdido'?'D93636':'B45309'}]);if(c.t)r.push(['“'+c.t+'”',{sz:10}]);r.push([' — '+(c.q||'')+', '+fh(c.f),{i:1,sz:9,c:'6B7280'}]);});return {s:16,r};};
+        const nCom=x=>(CM[x.ficha]||[]).length;
+        const fila=x=>({h:15*Math.max(2,lines(x.motivo)+1,nCom(x)*1.6),c:[{v:'●',s:DOT[x.color]||8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.motivo),prox(x),mon(x.agendado),mon(x.pagado),x.posterior?{v:Number(x.posterior),s:14}:{v:'—',s:15},com(x)]});
+        const filaNo=x=>({h:15*Math.max(2,nCom(x)*1.6),c:[{v:'●',s:8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.estado),prox(x),{v:'',s:19},{v:'',s:19},{v:'',s:19},com(x)]});
+        const H=['','FECHA','PACIENTE · MOTIVO','PRÓXIMA CITA','AGEND.','PAGÓ','DESPUÉS','COMENTARIO'];
+        const rows=[{h:26,c:[{v:d.sede+' · '+d.mes_label,s:1}]},
+          {h:18,c:[{r:[[String(Math.round(d.atendidos)),{b:1,sz:10}],[' nuevos atendidos de '+Math.round(d.agendados)+' agendados · pagado 1ª cita '+q0(d.pagado)+' · pagos después '+q0(d.posterior)+' · ',{sz:10,c:'374151'}],[Math.round(d.sin_cita||0)+' sin próxima cita',{b:1,sz:10,c:'D93636'}]],s:2}]},
+          {h:8,c:[]},
+          {h:20,c:H.map((t,k)=>({v:t,s:k>=4&&k<=6?18:(k===7?20:3)}))},
+          ...at.map(fila)];
+        if(no.length){rows.push({h:24,c:[{v:'No asistieron / cancelaron ('+no.length+')',s:17}]});no.forEach(x=>rows.push(filaNo(x)));}
+        const blob=xlsxBlob(rows,[4,8,62,18,10,10,10,48],(d.sede+' '+d.mes_label).replace(/[\\/?*\[\]:]/g,'').slice(0,31),{freeze:4,merges:['A1:H1','A2:H2']});
         const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Pacientes_nuevos_'+d.sede.replace(/\s+/g,'_')+'_'+d.mes_label.replace(/\s+/g,'_')+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
         bt.textContent='⬇ Descargar';
       }catch(e){bt.textContent='⚠ No se pudo, reintenta';}
