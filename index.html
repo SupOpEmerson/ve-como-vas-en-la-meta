@@ -154,7 +154,7 @@ async function descifrar(pw){
   const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
   const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(ENC.salt),iterations:ENC.iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
   const out=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(ENC.iv)},key,b64(ENC.ct))));
-  PW=pw; setTimeout(()=>cargarComs(),0); return out;
+  PW=pw; return out;
 }
 /* ---------- comentarios (Supabase, cifrados con la misma contraseña) ---------- */
 const SBU='https://undblfctjjzvltxzwlii.supabase.co/rest/v1/comentarios', SBK='sb_publishable_hVb--DGuCG3B-dvdncUd6w_x0AriAdd';
@@ -179,7 +179,7 @@ async function cargarComs(){
   if(window.__rerender)window.__rerender(true);
   if($('#cmx').classList.contains('on'))pintarCm();
 }
-setInterval(()=>cargarComs(),120000);
+
 const fh=iso=>{const d=new Date(iso);return d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit'});};
 let CMF=null, CMN='', CMS='', CMTAG='';
 const TAGS=['PX sin tratamientos futuros','PX perdido'];
@@ -363,12 +363,12 @@ function pacientes(D){
     const cmBtn=x=>{const n=(CM[x.ficha]||[]).length;return `<button class="cmb" data-cmf="${esc(x.ficha)}" data-cmn="${esc(titulo(x.paciente))}" data-cms="${esc(d.sede)}">💬 ${n?'Ver comentarios ('+n+')':'Comentar'}</button>`;};
     const cmc=x=>`<td class="cm">${cmList(x)}${cmBtn(x)}</td>`;
     const cmm=x=>`<span class="cmm">${cmList(x)}${cmBtn(x)}</span>`;
-    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}${cmm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}${cmc(x)}</tr>`;
-    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span>${pxm(x)}${cmm(x)}</td>${pxc(x)}<td class="nac" colspan="3"></td>${cmc(x)}</tr>`;
+    const fila=x=>`<tr><td class="c"><i class="sp ${COL[x.color]}"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.motivo)}</span>${pxm(x)}</td>${pxc(x)}<td>${q0(x.agendado)}</td><td>${q0(x.pagado)}</td>${x.posterior?`<td class="pp">${q0(x.posterior)}</td>`:'<td class="z">—</td>'}</tr>`;
+    const filaNo=x=>`<tr class="na"><td class="c"><i class="sp n"></i></td><td class="f">${esc(x.fecha.slice(0,5))}</td><td class="p">${esc(titulo(x.paciente))} <span class="fi">· ficha ${esc(x.ficha)}</span><span class="m">${esc(x.estado)}</span>${pxm(x)}</td>${pxc(x)}<td class="nac" colspan="3"></td></tr>`;
     $('#det').innerHTML=`<div class="dh"><h3>${esc(d.sede)} · ${esc(d.mes_label)}</h3><div class="dhb"><button id="descargar" class="dl" title="Descargar este listado en Excel">⬇ Descargar</button><button id="cerrar">Cerrar ✕</button></div></div>
     <div class="kp"><b>${Math.round(d.atendidos)}</b> nuevos atendidos de ${Math.round(d.agendados)} agendados · pagado 1ª cita ${q0(d.pagado)} · pagos después ${q0(d.posterior)} · <b style="color:#d93636">${Math.round(d.sin_cita||0)} sin próxima cita</b></div>
-    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th class="pxh">Próxima cita</th><th>Agend.</th><th>Pagó</th><th>Después</th><th class="cmh">Comentario</th></tr></thead><tbody>${at.map(fila).join('')}
-    ${no.length?`<tr><td colspan="8" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
+    <table class="dt"><thead><tr><th></th><th>Fecha</th><th>Paciente · motivo</th><th class="pxh">Próxima cita</th><th>Agend.</th><th>Pagó</th><th>Después</th></tr></thead><tbody>${at.map(fila).join('')}
+    ${no.length?`<tr><td colspan="7" style="text-align:left;padding-top:14px;font-weight:700;color:#6b7280">No asistieron / cancelaron (${no.length})</td></tr>${no.map(filaNo).join('')}`:''}</tbody></table>`;
     $('#det').classList.add('on');
     $('#cerrar').onclick=()=>{sel=null;render();$('#pn').scrollIntoView({behavior:'smooth'});};
     $('#descargar').onclick=async()=>{const bt=$('#descargar');bt.disabled=true;bt.textContent='Preparando…';
@@ -380,16 +380,16 @@ function pacientes(D){
         const mon=v=>(v===null||v===undefined||v==='')?{v:'—',s:15}:{v:Number(v),s:13};
         const com=x=>{const l=CM[x.ficha]||[];if(!l.length)return {v:'',s:19};const r=[];l.forEach((c,k)=>{if(k)r.push(['\n',{}]);if(c.tag)r.push([c.tag+'  ',{b:1,sz:10,c:c.tag==='PX perdido'?'D93636':'B45309'}]);if(c.t)r.push(['“'+c.t+'”',{sz:10}]);r.push([' — '+(c.q||'')+', '+fh(c.f),{i:1,sz:9,c:'6B7280'}]);});return {s:16,r};};
         const nCom=x=>(CM[x.ficha]||[]).length;
-        const fila=x=>({h:15*Math.max(2,lines(x.motivo)+1,nCom(x)*1.6),c:[{v:'●',s:DOT[x.color]||8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.motivo),prox(x),mon(x.agendado),mon(x.pagado),x.posterior?{v:Number(x.posterior),s:14}:{v:'—',s:15},com(x)]});
-        const filaNo=x=>({h:15*Math.max(2,nCom(x)*1.6),c:[{v:'●',s:8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.estado),prox(x),{v:'',s:19},{v:'',s:19},{v:'',s:19},com(x)]});
-        const H=['','FECHA','PACIENTE · MOTIVO','PRÓXIMA CITA','AGEND.','PAGÓ','DESPUÉS','COMENTARIO'];
+        const fila=x=>({h:15*Math.max(2,lines(x.motivo)+1),c:[{v:'●',s:DOT[x.color]||8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.motivo),prox(x),mon(x.agendado),mon(x.pagado),x.posterior?{v:Number(x.posterior),s:14}:{v:'—',s:15}]});
+        const filaNo=x=>({h:30,c:[{v:'●',s:8},{v:x.fecha.slice(0,5),s:9},pacR(x,x.estado),prox(x),{v:'',s:19},{v:'',s:19},{v:'',s:19}]});
+        const H=['','FECHA','PACIENTE · MOTIVO','PRÓXIMA CITA','AGEND.','PAGÓ','DESPUÉS'];
         const rows=[{h:26,c:[{v:d.sede+' · '+d.mes_label,s:1}]},
           {h:18,c:[{r:[[String(Math.round(d.atendidos)),{b:1,sz:10}],[' nuevos atendidos de '+Math.round(d.agendados)+' agendados · pagado 1ª cita '+q0(d.pagado)+' · pagos después '+q0(d.posterior)+' · ',{sz:10,c:'374151'}],[Math.round(d.sin_cita||0)+' sin próxima cita',{b:1,sz:10,c:'D93636'}]],s:2}]},
           {h:8,c:[]},
           {h:20,c:H.map((t,k)=>({v:t,s:k>=4&&k<=6?18:(k===7?20:3)}))},
           ...at.map(fila)];
         if(no.length){rows.push({h:24,c:[{v:'No asistieron / cancelaron ('+no.length+')',s:17}]});no.forEach(x=>rows.push(filaNo(x)));}
-        const blob=xlsxBlob(rows,[4,8,62,18,10,10,10,48],(d.sede+' '+d.mes_label).replace(/[\\/?*\[\]:]/g,'').slice(0,31),{freeze:4,merges:['A1:H1','A2:H2']});
+        const blob=xlsxBlob(rows,[4,8,66,18,11,11,11],(d.sede+' '+d.mes_label).replace(/[\\/?*\[\]:]/g,'').slice(0,31),{freeze:4,merges:['A1:G1','A2:G2']});
         const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Pacientes_nuevos_'+d.sede.replace(/\s+/g,'_')+'_'+d.mes_label.replace(/\s+/g,'_')+'.xlsx';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
         bt.textContent='⬇ Descargar';
       }catch(e){bt.textContent='⚠ No se pudo, reintenta';}
